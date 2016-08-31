@@ -7,6 +7,7 @@ int pirPin = 2; //digital 2
 int flexSensorPin = A0; //analog pin 0
 int softpotPin = A1;
 int led_pin_out = 12;
+int vib_in = A2;
 
 void setup(){
   Serial.begin(9600); 
@@ -36,8 +37,12 @@ void loop(){
 //  int flex0to100 = map(flexSensorReading, 90, 230, 0, 100);
 //  Serial.println(flex0to100);
 
+  int vib_val= analogRead(vib_in);
+  if(vib_val > 50) {
+    Serial.println(vib_val);
+  }
   
-  int softpotReading = analogRead(softpotPin);
-  Serial.println(softpotReading);
+//  int softpotReading = analogRead(softpotPin);
+//  Serial.println(softpotReading);
 
 }
