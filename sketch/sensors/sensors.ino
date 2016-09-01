@@ -10,12 +10,9 @@
 #include <Adafruit_GFX.h>
 #include <gfxfont.h>
 
-#include <Adafruit_DotStarMatrix.h>
-#include <gamma.h>
-
 #include <Servo.h>
 
-#define NUMPIXELS 8
+#define NUMPIXELS 7
 
 #define DATAPIN  4
 #define CLOCKPIN 5
@@ -95,14 +92,24 @@ void loop(){
   long color = 0;
   if(game_on) {
     int softpotReading = analogRead(softpotPin);
-  //  Serial.println(softpotReading);
-    float hue = mapfloat(softpotReading, 5, 1000, 0, HUE_MAX);
-  //  Serial.println(hue);
-    if(hue < 0) hue = 0;
-    if(hue > 6) hue = 6;
-    last_hue = hue;
-    // TODO count hue slider hold
-    color = HSV_to_RGB(hue, 1.0, 1.0);
+//    Serial.println(softpotReading);
+    if(15 <= softpotReading && softpotReading <= 900) {
+      float hue = mapfloat(softpotReading, 40, 900, 0, HUE_MAX);
+    //  Serial.println(hue);
+      if(hue < 0) hue = 0;
+      if(hue > 6) hue = 6;
+      last_hue = hue;
+      // TODO count hue slider hold
+      color = HSV_to_RGB(hue, 1.0, 1.0);
+    } else if(40 > softpotReading) {
+      float gr = mapfloat(softpotReading, 0, 40, 0, 1);
+      color = HSV_to_RGB(0, gr, gr);
+//      Serial.print("gr = ");Serial.print(gr);Serial.print("sr = ");Serial.println(softpotReading);
+    } else {
+      float gr = mapfloat(softpotReading, 1024, 900, 0, 1);
+      color = HSV_to_RGB(0, gr, gr);
+//      Serial.print("gr = ");Serial.print(gr);Serial.print("sr = ");Serial.println(softpotReading);
+    }
   }
   for(int i = 0; i < NUMPIXELS; i++) {
       strip.setPixelColor(i, color);
