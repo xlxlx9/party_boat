@@ -3,46 +3,182 @@
  *
  *
  **/
-int pirPin = 2; //digital 2
-int flexSensorPin = A0; //analog pin 0
+ #include <SPI.h>
+
+#include <Adafruit_DotStar.h>
+
+#include <Adafruit_GFX.h>
+#include <gfxfont.h>
+
+#include <Adafruit_DotStarMatrix.h>
+#include <gamma.h>
+
+#include <Servo.h>
+
+#define NUMPIXELS 8
+
+#define DATAPIN  4
+#define CLOCKPIN 5
+
+#define HUE_MAX  6.0
+#define SW_MOTION_INF_CNT 30
+
+Adafruit_DotStar strip = Adafruit_DotStar(7, DATAPIN, CLOCKPIN, DOTSTAR_BRG);
+int succ_pir_pin = 2; //digital 2
+int flexSensorPin = A3; //analog pin 3, 0 is reserved for random seed
 int softpotPin = A1;
 int led_pin_out = 12;
 int vib_in = A2;
+int switch_pin = 7;
+int servo_pin = 9;
+
+int last_sw = LOW;
+bool game_on = false;
+int last_angle = -1;
+int last_hue = -1;
+int hue_cnt = 0;
+bool judged = false;
+int sw_motion_inf = 0;
+
+Servo pointer;
 
 void setup(){
   Serial.begin(9600); 
-  pinMode(pirPin, INPUT);
+  randomSeed(analogRead(0));
+  pointer.write(0);
+
+  pointer.attach(servo_pin);
+  pinMode(succ_pir_pin, INPUT);
   pinMode(led_pin_out, OUTPUT);
+  pinMode(switch_pin, INPUT);
+  last_sw = digitalRead(switch_pin);
   digitalWrite(led_pin_out, LOW);
   digitalWrite(softpotPin, HIGH); //enable pullup resistor
+  
+#if defined(__AVR_ATtiny85__) && (F_CPU == 16000000L)
+  clock_prescale_set(clock_div_1); // Enable 16 MHz on Trinket
+#endif
+
+  strip.begin(); // Initialize pins for output
+  strip.show();  // Turn all LEDs off ASAP
 }
 
 
 void loop(){
-//  int pirVal = digitalRead(pirPin);
-//
-//  if(pirVal == LOW){ //was motion detected
-//    Serial.println("Motion Detected");
-//    digitalWrite(led_pin_out, HIGH);
-//    delay(2000); 
-//  } else {
-//    digitalWrite(led_pin_out, LOW);
-//    delay(1000);
-//  }
-//  digitalWrite(led_pin_out, LOW);
-//  delay(500); 
   
 //  int flexSensorReading = analogRead(flexSensorPin);
 //  Serial.println(flexSensorReading);
 //  int flex0to100 = map(flexSensorReading, 90, 230, 0, 100);
 //  Serial.println(flex0to100);
 
-  int vib_val= analogRead(vib_in);
-  if(vib_val > 50) {
-    Serial.println(vib_val);
+//  int vib_val= analogRead(vib_in);
+//  if(vib_val > 50) {
+//    Serial.println(vib_val);
+//  }
+  int sw = digitalRead(switch_pin);
+  if(sw != last_sw) {
+    last_sw = sw;
+    if(sw) {
+      game_on = !game_on;
+      if(game_on) {
+        // rotate pointer
+        int rand_angle = random(45, 300);
+        while(-1 != last_angle && last_angle == rand_angle) {
+          rand_angle = random(45, 300);
+        }
+        pointer.write(rand_angle);
+        last_angle == rand_angle;
+      }
+      judged = false; // clear it
+      sw_motion_inf = SW_MOTION_INF_CNT;
+      Serial.println(game_on? "Switched on!" : "Switched off!");
+    }
   }
-  
-//  int softpotReading = analogRead(softpotPin);
-//  Serial.println(softpotReading);
 
+  long color = 0;
+  if(game_on) {
+    int softpotReading = analogRead(softpotPin);
+  //  Serial.println(softpotReading);
+    float hue = mapfloat(softpotReading, 5, 1000, 0, HUE_MAX);
+  //  Serial.println(hue);
+    if(hue < 0) hue = 0;
+    if(hue > 6) hue = 6;
+    last_hue = hue;
+    // TODO count hue slider hold
+    color = HSV_to_RGB(hue, 1.0, 1.0);
+  }
+  for(int i = 0; i < NUMPIXELS; i++) {
+      strip.setPixelColor(i, color);
+      strip.show();
+      delay(15);
+  }
+  int succ_val = digitalRead(succ_pir_pin);
+  Serial.print("succ val: ");Serial.println(succ_val);
+  if(sw_motion_inf > 0) {
+    sw_motion_inf --;
+  }
+  if(game_on && !judged && 0 == sw_motion_inf) {
+    if(succ_val == LOW){ //was motion detected
+      Serial.println("Success Motion Detected");
+      judged = true;
+      digitalWrite(led_pin_out, HIGH);
+      delay(800); 
+      digitalWrite(led_pin_out, LOW);
+      delay(800); 
+      digitalWrite(led_pin_out, HIGH);
+      delay(800); 
+      digitalWrite(led_pin_out, LOW);
+    } else {
+      digitalWrite(led_pin_out, LOW);
+  //    int fail_val = digitalRead(succ_pir_pin);
+  //    digitalWrite(led_pin_out, LOW);
+  //    delay(1000);
+    }
+  //  digitalWrite(led_pin_out, LOW);
+  //  delay(500); 
+  }
+}
+
+long HSV_to_RGB( float h, float s, float v ) {
+  /* modified from Alvy Ray Smith's site: http://www.alvyray.com/Papers/hsv2rgb.htm */
+  // H is given on [0, 6]. S and V are given on [0, 1].
+  // RGB is returned as a 24-bit long #rrggbb
+  int i;
+  float m, n, f;
+ 
+  // not very elegant way of dealing with out of range: return black
+  if ((s<0.0) || (s>1.0) || (v<0.0) || (v>1.0)) {
+    return 0L;
+  }
+ 
+  if ((h < 0.0) || (h > 6.0)) {
+    return long( v * 255 ) + long( v * 255 ) * 256 + long( v * 255 ) * 65536;
+  }
+  i = floor(h);
+  f = h - i;
+  if ( !(i&1) ) {
+    f = 1 - f; // if i is even
+  }
+  m = v * (1 - s);
+  n = v * (1 - s * f);
+  switch (i) {
+  case 6:
+  case 0:
+    return long(v * 255 ) * 65536 + long( n * 255 ) * 256 + long( m * 255);
+  case 1:
+    return long(n * 255 ) * 65536 + long( v * 255 ) * 256 + long( m * 255);
+  case 2:
+    return long(m * 255 ) * 65536 + long( v * 255 ) * 256 + long( n * 255);
+  case 3:
+    return long(m * 255 ) * 65536 + long( n * 255 ) * 256 + long( v * 255);
+  case 4:
+    return long(n * 255 ) * 65536 + long( m * 255 ) * 256 + long( v * 255);
+  case 5:
+    return long(v * 255 ) * 65536 + long( m * 255 ) * 256 + long( n * 255);
+  }
+}
+
+float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
