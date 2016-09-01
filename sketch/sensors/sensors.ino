@@ -21,7 +21,6 @@
 #define CLOCKPIN 5
 
 #define HUE_MAX  6.0
-#define SW_MOTION_INF_CNT 30
 
 Adafruit_DotStar strip = Adafruit_DotStar(7, DATAPIN, CLOCKPIN, DOTSTAR_BRG);
 int succ_pir_pin = 2; //digital 2
@@ -38,7 +37,6 @@ int last_angle = -1;
 int last_hue = -1;
 int hue_cnt = 0;
 bool judged = false;
-int sw_motion_inf = 0;
 
 Servo pointer;
 
@@ -90,7 +88,6 @@ void loop(){
         last_angle == rand_angle;
       }
       judged = false; // clear it
-      sw_motion_inf = SW_MOTION_INF_CNT;
       Serial.println(game_on? "Switched on!" : "Switched off!");
     }
   }
@@ -112,30 +109,22 @@ void loop(){
       strip.show();
       delay(15);
   }
-  int succ_val = digitalRead(succ_pir_pin);
-  Serial.print("succ val: ");Serial.println(succ_val);
-  if(sw_motion_inf > 0) {
-    sw_motion_inf --;
-  }
-  if(game_on && !judged && 0 == sw_motion_inf) {
-    if(succ_val == LOW){ //was motion detected
-      Serial.println("Success Motion Detected");
-      judged = true;
-      digitalWrite(led_pin_out, HIGH);
-      delay(800); 
-      digitalWrite(led_pin_out, LOW);
-      delay(800); 
-      digitalWrite(led_pin_out, HIGH);
-      delay(800); 
-      digitalWrite(led_pin_out, LOW);
-    } else {
-      digitalWrite(led_pin_out, LOW);
-  //    int fail_val = digitalRead(succ_pir_pin);
-  //    digitalWrite(led_pin_out, LOW);
-  //    delay(1000);
-    }
-  //  digitalWrite(led_pin_out, LOW);
-  //  delay(500); 
+  int flex_val = analogRead(flexSensorPin);
+//  Serial.print("flex_val = ");Serial.println(flex_val);
+  if(game_on && !judged) {
+      if(flex_val < 70) {
+        Serial.println("Success Motion Detected");
+        judged = true;
+        digitalWrite(led_pin_out, HIGH);
+        delay(800); 
+        digitalWrite(led_pin_out, LOW);
+        delay(800); 
+        digitalWrite(led_pin_out, HIGH);
+        delay(800); 
+        digitalWrite(led_pin_out, LOW);
+      } else {
+        digitalWrite(led_pin_out, LOW);
+      }
   }
 }
 
